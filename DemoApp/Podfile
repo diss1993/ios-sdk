@@ -1,0 +1,15 @@
+use_frameworks!
+platform :ios, '11.0'
+
+target 'REES46Demo' do
+  pod 'REES46', :path => '../'
+
+  pod 'Firebase'
+  pod 'Firebase/Core'
+  pod 'Firebase/Messaging'
+  
+  target 'REES46Tests' do
+    inherit! :search_paths
+    
+  end
+end

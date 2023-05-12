@@ -1,6 +1,9 @@
-
 //
 //  SimplePersonaliztionSDK.swift
+//  REES46
+//
+//  Created by REES46
+//  Copyright (c) 2023. All rights reserved.
 //
 
 import Foundation
@@ -8,7 +11,7 @@ import Foundation
 public var global_EL: Bool = true
 
 class SimplePersonalizationSDK: PersonalizationSDK {
-
+    private var storiesCode: String? = nil
     var shopId: String
     var deviceID: String
     var userSeance: String
@@ -63,14 +66,12 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                             completion(nil)
                         }
                     }else{
-                        print("PersonalizationSDK error: SDK DECODE FAIL")
                         if let completion = completion {
                             completion(.decodeError)
                         }
                     }
                     self.semaphore.signal()
                 case .failure(let error):
-                    print("PersonalizationSDK error: SDK INIT FAIL")
                     if let completion = completion {
                         completion(error)
                     }
@@ -124,7 +125,7 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "token": token,
-                "platform": "android",
+                "platform": "ios",
             ]
             let sessionConfig = URLSessionConfiguration.default
             sessionConfig.timeoutIntervalForRequest = 1
@@ -177,7 +178,7 @@ class SimplePersonalizationSDK: PersonalizationSDK {
             ]
             if rate < 1 || rate > 10 {
                 completion(.failure(.custom(error: "Error: rating can be between 1 and 10 only")))
-                return //выходим из review
+                return // Exit from review
             }
             let sessionConfig = URLSessionConfiguration.default
             sessionConfig.timeoutIntervalForRequest = 1
@@ -193,63 +194,64 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         }
     }
 
-    func setProfileData(userEmail: String?, userPhone: String?, userLoyaltyId: String?, birthday: Date?, age: Int?, firstName: String?, lastName: String?, location: String?, gender: Gender?, fbID: String?, vkID: String?, telegramID: String?, loyaltyCardLocation: String?, loyaltyStatus: String?, loyaltyBonuses: Int?, loyaltyBonusesToNextLevel: Int?, boughtSomething: Bool?, userId: String?, customProperties: [String: String?]?, completion: @escaping (Result<Void, SDKError>) -> Void) {
+    func setProfileData(userEmail: String?, userPhone: String?, userLoyaltyId: String?, birthday: Date?, age: Int?, firstName: String?, lastName: String?, location: String?, gender: Gender?, fbID: String?, vkID: String?, telegramID: String?, loyaltyCardLocation: String?, loyaltyStatus: String?, loyaltyBonuses: Int?, loyaltyBonusesToNextLevel: Int?, boughtSomething: Bool?, userId: String?, customProperties: [String: Any?]?, completion: @escaping (Result<Void, SDKError>) -> Void) {
         mySerialQueue.async {
             
             let path = "profile/set"
             
-            var paramsTemp: [String: String?] = [
+            var paramsTemp: [String: Any?] = [
                 "shop_id": self.shopId,
                 "did": self.deviceID,
-                "seance": self.userSeance
+                "seance": self.userSeance,
+                "sid": self.userSeance,
             ]
             
             if let userEmail = userEmail {
-                paramsTemp["email"] = userEmail
+                paramsTemp["email"] = String(userEmail)
             }
             
             if let firstName = firstName {
-                paramsTemp["first_name"] = firstName
+                paramsTemp["first_name"] = String(firstName)
             }
             
             if let lastName = lastName {
-                paramsTemp["last_name"] = lastName
+                paramsTemp["last_name"] = String(lastName)
             }
             
             if let userPhone = userPhone {
-                paramsTemp["phone"] = userPhone
+                paramsTemp["phone"] = String(userPhone)
             }
             
             if let location = location {
-                paramsTemp["location"] = location
+                paramsTemp["location"] = String(location)
             }
 
             if let loyaltyCardLocation = loyaltyCardLocation {
-                paramsTemp["loyalty_card_location"] = loyaltyCardLocation
+                paramsTemp["loyalty_card_location"] = String(loyaltyCardLocation)
             }
 
             if let userLoyaltyId = userLoyaltyId {
-                paramsTemp["loyalty_id"] = userLoyaltyId
+                paramsTemp["loyalty_id"] = String(userLoyaltyId)
             }
 
             if let loyaltyStatus = loyaltyStatus {
-                paramsTemp["loyalty_status"] = loyaltyStatus
+                paramsTemp["loyalty_status"] = String(loyaltyStatus)
             }
 
             if let fbID = fbID {
-                paramsTemp["fb_id"] = fbID
+                paramsTemp["fb_id"] = String(fbID)
             }
             
             if let vkID = vkID {
-                paramsTemp["vk_id"] = vkID
+                paramsTemp["vk_id"] = String(vkID)
             }
             
             if let telegramID = telegramID {
-                paramsTemp["telegram_id"] = telegramID
+                paramsTemp["telegram_id"] = String(telegramID)
             }
             
             if let userId = userId {
-                paramsTemp["id"] = userId
+                paramsTemp["id"] = String(userId)
             }
             
             if gender == .male {
@@ -291,10 +293,15 @@ class SimplePersonalizationSDK: PersonalizationSDK {
             sessionConfig.timeoutIntervalForRequest = 1
             self.urlSession = URLSession(configuration: sessionConfig)
             
-            var params: [String: String] = [String: String]()
+            var params: [String: Any] = [String: Any]()
             for item in paramsTemp {
-                if let value = item.value {
-                    params[item.key] = value
+                if item.value is Date {
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "YYYY-MM-dd"
+                    guard let date = item.value as? Date else {continue}
+                    params[item.key] = formatter.string(from: date)
+                } else {
+                    params[item.key] = item.value
                 }
             }
             
@@ -317,16 +324,28 @@ class SimplePersonalizationSDK: PersonalizationSDK {
 
     func track(event: Event, recommendedBy: RecomendedBy?, completion: @escaping (Result<Void, SDKError>) -> Void) {
         mySerialQueue.async {
-            let path = "push"
+            var path = "push"
             var paramEvent = ""
             var params: [String: Any] = [
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
-                "segment": self.segment,
-                "stream": self.stream
+                "sid": self.userSeance,
+                "segment": self.segment
             ]
             switch event {
+            case let .slideView(storyId, slideId):
+                params["story_id"] = storyId
+                params["slide_id"] = slideId
+                params["code"] = self.storiesCode
+                path = "stories/push"
+                paramEvent = "view"
+            case let .slideClick(storyId, slideId):
+                params["story_id"] = storyId
+                params["slide_id"] = slideId
+                params["code"] = self.storiesCode
+                path = "stories/push"
+                paramEvent = "click"
             case let .search(query):
                 params["search_query"] = query
                 paramEvent = "search"
@@ -336,8 +355,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
             case let .productView(id):
                 params["items"] = [["id":id]]
                 paramEvent = "view"
-            case let .productAddedToCart(id):
-                params["items"] = [["id":id]]
+            case let .productAddedToCart(id, amount):
+                params["items"] = [["id":id, "amount":amount]]
                 paramEvent = "cart"
             case let .productAddedToFavorities(id):
                 params["items"] = [["id":id]]
@@ -348,17 +367,33 @@ class SimplePersonalizationSDK: PersonalizationSDK {
             case let .productRemovedToFavorities(id):
                 params["items"] = [["id":id]]
                 paramEvent = "remove_wish"
-            case let .orderCreated(orderId, totalValue, products):
+            case let .orderCreated(orderId, totalValue, products, deliveryAddress, deliveryType, promocode, paymentType, taxFree):
                 var tempItems: [[String: Any]] = []
                 for (_, item) in products.enumerated() {
                     tempItems.append([
                         "id": item.id,
-                        "amount": String(item.amount)
+                        "amount": String(item.amount),
+                        "price": item.price
                     ])
                 }
                 params["items"] = tempItems
                 params["order_id"] = orderId
                 params["order_price"] = "\(totalValue)"
+                if let deliveryAddress = deliveryAddress {
+                    params["delivery_address"] = deliveryAddress
+                }
+                if let deliveryType = deliveryType {
+                    params["delivery_type"] = deliveryType
+                }
+                if let promocode = promocode {
+                    params["promocode"] = promocode
+                }
+                if let paymentType = paymentType {
+                    params["payment_type"] = paymentType
+                }
+                if let taxFree = taxFree {
+                    params["tax_free"] = taxFree
+                }
                 paramEvent = "purchase"
             case let .synchronizeCart(items):
                 var tempItems: [[String: Any]] = []
@@ -431,8 +466,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "segment": self.segment,
-                "stream": self.stream,
                 "event": event
             ]
             
@@ -496,6 +531,7 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "extended": "true",
                 "resize_image": "180",
                 "segment": self.segment
@@ -541,10 +577,10 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "type": "full_search",
                 "search_query": query,
-                "segment": self.segment,
-                "stream": self.stream
+                "segment": self.segment
             ]
             if let limit = limit{
                 params["limit"] = String(limit)
@@ -629,10 +665,10 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "type": "instant_search",
                 "search_query": query,
-                "segment": self.segment,
-                "stream": self.stream
+                "segment": self.segment
             ]
             
             if let locations = locations{
@@ -686,6 +722,32 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         }
     }
     
+    // Send tracking event when user receive mobile push notification
+    func notificationReceived(type: String, code: String, completion: @escaping (Result<Void, SDKError>) -> Void) {
+        mySerialQueue.async {
+            let path = "track/received"
+            let params: [String: String] = [
+                "shop_id": self.shopId,
+                "did": self.deviceID,
+                "code": code,
+                "type": type
+            ]
+            
+            let sessionConfig = URLSessionConfiguration.default
+            sessionConfig.timeoutIntervalForRequest = 1
+            self.urlSession = URLSession(configuration: sessionConfig)
+            
+            self.postRequest(path: path, params: params, completion: { result in
+                switch result {
+                case .success:
+                    completion(.success(Void()))
+                case let .failure(error):
+                    completion(.failure(error))
+                }
+            })
+        }
+    }
+    
     
     func subscribeForPriceDrop(id: String, currentPrice: Double, email: String? = nil, phone: String? = nil, completion: @escaping (Result<Void, SDKError>) -> Void) {
         mySerialQueue.async {
@@ -694,8 +756,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "segment": self.segment,
-                "stream": self.stream,
                 "item_id": id,
                 "price": currentPrice
             ]
@@ -712,14 +774,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
 
             self.postRequest(path: path, params: params, completion: { result in
                 switch result {
-                case let .success(successResult):
-                    let resJSON = successResult
-                    let status = resJSON["status"] as? String ?? ""
-                    if status == "success" {
-                        completion(.success(Void()))
-                    } else {
-                        completion(.failure(.responseError))
-                    }
+                case .success(_):
+                    completion(.success(Void()))
                 case let .failure(error):
                     completion(.failure(error))
                 }
@@ -734,8 +790,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
                 "shop_id": self.shopId,
                 "did": self.deviceID,
                 "seance": self.userSeance,
+                "sid": self.userSeance,
                 "segment": self.segment,
-                "stream": self.stream,
                 "item_id": id
             ]
             
@@ -751,14 +807,8 @@ class SimplePersonalizationSDK: PersonalizationSDK {
 
             self.postRequest(path: path, params: params, completion: { result in
                 switch result {
-                case let .success(successResult):
-                    let resJSON = successResult
-                    let status = resJSON["status"] as? String ?? ""
-                    if status == "success" {
-                        completion(.success(Void()))
-                    } else {
-                        completion(.failure(.responseError))
-                    }
+                case .success(_):
+                    completion(.success(Void()))
                 case let .failure(error):
                     completion(.failure(error))
                 }
@@ -766,7 +816,114 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         }
     }
     
+    func manageSubscription(email: String? = nil, phone: String? = nil, emailBulk: Bool? = nil, emailChain: Bool? = nil, emailTransactional: Bool? = nil, smsBulk: Bool? = nil, smsChain: Bool? = nil, smsTransactional: Bool? = nil, webPushBulk: Bool? = nil, webPushChain: Bool? = nil, webPushTransactional: Bool? = nil, mobilePushBulk: Bool? = nil, mobilePushChain: Bool? = nil, mobilePushTransactional: Bool? = nil, completion: @escaping(Result<Void, SDKError>) -> Void) {
+        
+        let path = "subscriptions/manage"
+        var params: [String: Any] = [
+            "shop_id": self.shopId,
+            "did": self.deviceID,
+            "seance": self.userSeance,
+            "sid": self.userSeance,
+            "segment": self.segment
+        ]
+        
+        // If has email
+        if let email = email {
+            params["email"] = email
+        }
+        
+        // If has phone
+        if let phone = phone {
+            params["phone"] = phone
+        }
+        
+        if let emailBulk               = emailBulk            { params["email_bulk"]              = emailBulk }
+        if let emailChain              = emailChain           { params["email_chain"]             = emailChain }
+        if let emailTransactional      = emailTransactional   { params["email_transactional"]     = emailTransactional }
+        if let smsBulk                 = smsBulk              { params["sms_bulk"]                = smsBulk }
+        if let smsChain                = smsChain             { params["sms_chain"]               = smsChain }
+        if let smsTransactional        = smsTransactional     { params["sms_transactional"]       = smsTransactional }
+        if let webPushBulk             = webPushBulk          { params["web_push_bulk"]           = webPushBulk }
+        if let webPushChain            = webPushChain         { params["web_push_chain"]          = webPushChain }
+        if let webPushTransactional    = webPushTransactional { params["web_push_transactional"]  = webPushTransactional }
+        if let mobilePushBulk          = mobilePushBulk          { params["mobile_push_bulk"]             = mobilePushBulk }
+        if let mobilePushChain         = mobilePushChain         { params["mobile_push_chain"]            = mobilePushChain }
+        if let mobilePushTransactional = mobilePushTransactional { params["mobile_push_transactional"]    = mobilePushTransactional }
+
+        self.postRequest(path: path, params: params, completion: { result in
+            switch result {
+            case .success(_):
+                completion(.success(Void()))
+            case let .failure(error):
+                completion(.failure(error))
+            }
+        })
+        
+    }
     
+    func addToSegment(segmentId: String, email: String? = nil, phone: String? = nil, completion: @escaping (Result<Void, SDKError>) -> Void) {
+        mySerialQueue.async {
+            let path = "segments/add"
+            var params: [String: Any] = [
+                "shop_id": self.shopId,
+                "did": self.deviceID,
+                "seance": self.userSeance,
+                "sid": self.userSeance,
+                "segment_id": segmentId
+            ]
+            
+            // If has email
+            if let email = email {
+                params["email"] = email
+            }
+            
+            // If has phone
+            if let phone = phone {
+                params["phone"] = phone
+            }
+
+            self.postRequest(path: path, params: params, completion: { result in
+                switch result {
+                case .success(_):
+                    completion(.success(Void()))
+                case let .failure(error):
+                    completion(.failure(error))
+                }
+            })
+        }
+    }
+    
+    func removeFromSegment(segmentId: String, email: String? = nil, phone: String? = nil, completion: @escaping (Result<Void, SDKError>) -> Void) {
+        mySerialQueue.async {
+            let path = "segments/remove"
+            var params: [String: Any] = [
+                "shop_id": self.shopId,
+                "did": self.deviceID,
+                "seance": self.userSeance,
+                "sid": self.userSeance,
+                "segment_id": segmentId
+            ]
+            
+            // If has email
+            if let email = email {
+                params["email"] = email
+            }
+            
+            // If has phone
+            if let phone = phone {
+                params["phone"] = phone
+            }
+
+            self.postRequest(path: path, params: params, completion: { result in
+                switch result {
+                case .success(_):
+                    completion(.success(Void()))
+                case let .failure(error):
+                    completion(.failure(error))
+                }
+            })
+        }
+    }
 
     private func sendInitRequest(completion: @escaping (Result<InitResponse, SDKError>) -> Void) {
         let path = "init"
@@ -774,8 +931,7 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         let hours = secondsFromGMT/3600
         let params: [String: String] = [
             "shop_id": shopId,
-            "tz": String(hours),
-            "stream": self.stream
+            "tz": String(hours)
         ]
         
         let sessionConfig = URLSessionConfiguration.default
@@ -795,6 +951,29 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         }
     }
     
+    
+    func getStories(code: String, completion: @escaping (Result<StoryContent, SDKError>) -> Void) {
+        self.storiesCode = code
+        let path = "stories/\(code)"
+        let params: [String: String] = [
+            "shop_id": shopId,
+            "did": deviceID
+        ]
+        let sessionConfig = URLSessionConfiguration.default
+        sessionConfig.timeoutIntervalForRequest = 10
+        self.urlSession = URLSession(configuration: sessionConfig)
+        getRequest(path: path, params: params, true) { result in
+
+            switch result {
+            case let .success(successResult):
+                let res = StoryContent(json: successResult)
+                completion(.success(res))
+            case let .failure(error):
+                completion(.failure(error))
+            }
+        }
+    }
+    
 
     private let jsonDecoder: JSONDecoder = {
         let jsonDecoder = JSONDecoder()
@@ -808,13 +987,13 @@ class SimplePersonalizationSDK: PersonalizationSDK {
     private func getRequest(path: String, params: [String: String], _ isInit: Bool = false, completion: @escaping (Result<[String: Any], SDKError>) -> Void) {
 
         let urlString = baseURL + path
-
         var url = URLComponents(string: urlString)
 
         var queryItems = [URLQueryItem]()
         for item in params{
             queryItems.append(URLQueryItem(name: item.key, value: item.value))
         }
+        queryItems.append(URLQueryItem(name: "stream", value: stream))
         url?.queryItems = queryItems
 
         if let endUrl = url?.url {
@@ -850,11 +1029,19 @@ class SimplePersonalizationSDK: PersonalizationSDK {
     }
 
     private func postRequest(path: String, params: [String: Any], completion: @escaping (Result<[String: Any], SDKError>) -> Void) {
+        
+        var requestParams : [String: Any] = [
+            "stream": stream
+        ]
+        for (key, value) in params {
+                  requestParams[key] = value
+             }
+
         if let url = URL(string: baseURL + path) {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             do {
-                request.httpBody = try JSONSerialization.data(withJSONObject: params, options: .prettyPrinted)
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestParams, options: .prettyPrinted)
             } catch let error {
                 completion(.failure(.custom(error: "00001: \(error.localizedDescription)")))
                 return
@@ -902,13 +1089,14 @@ class SimplePersonalizationSDK: PersonalizationSDK {
         }
     }
 
-    private func getPostString(params: [String: Any]) -> String {
-        var data = [String]()
-        for (key, value) in params {
-            data.append(key + "=\(value)")
-        }
-        return data.map { String($0) }.joined(separator: "&")
-    }
+    // @DELETE after 2022-09-15
+//    private func getPostString(params: [String: Any]) -> String {
+//        var data = [String]()
+//        for (key, value) in params {
+//            data.append(key + "=\(value)")
+//        }
+//        return data.map { String($0) }.joined(separator: "&")
+//    }
 }
 
 extension URLSession {

@@ -3,6 +3,8 @@
 /Packages
 /*.xcodeproj
 xcuserdata/
-Example/Pods
+DemoApp/Pods
+DemoApp/Podfile.lock
+DemoApp/REES46Demo/GoogleService-Info.plist
 .idea
 .swiftpm
